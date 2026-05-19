@@ -665,6 +665,8 @@ void free_memory() {
 }
 
 ///Assigment3
+
+
 Token *crtTk;
 Token *consumedTk;
 
@@ -678,8 +680,8 @@ int consume(int code){
 }
 
 int unit();
-int structdef();
-int vardef();
+int structDef();
+int varDef();
 int typeBase();
 int arrayDecl();
 int fnDef();
@@ -701,135 +703,462 @@ int exprPrimary();
 
 int typeBase(){
     Token *startTk=crtTk;
-    if(consume(INT)) {
+
+    if(consume(INT)) return 1;
+    if(consume(DOUBLE)) return 1;
+    if(consume(CHAR)) return 1;
+
+    if(consume(STRUCT)){
+        if(!consume(ID)) tkerr(crtTk,"missing struct name");
         return 1;
     }
-    if(consume(DOUBLE)) {
-        return 1;
-    }
-    if(consume(CHAR)) {
-        return 1;
-    }
-    if(consume(STRUCT)) {
-        if(consume(ID)){
-             return 1;
-        }
-        tkerr(crtTk,"missing ID after STRUCT");
-       
-    }
+
     crtTk=startTk;
     return 0;
 }
 
 int arrayDecl(){
-    Token *startTk=crtTk;
-    if(consume(LBRACKET)){
-        consume(CT_INT);
-        if(!consume(RBRACKET)){
-            tkerr(crtTk,"missing ]");
-            return 1;
-        }
-        crtTk=startTk;
-        return 0;
-    }
+    if(!consume(LBRACKET)) return 0;
+
+    consume(CT_INT);
+
+    if(!consume(RBRACKET))
+        tkerr(crtTk,"missing ]");
+
+    return 1;
 }
 
 int varDef(){
     Token *startTk=crtTk;
+
     if(typeBase()){
-        if(!consume(ID)) tkerr(crtTk,"missing variable name");
+        if(!consume(ID))
+            tkerr(crtTk,"missing variable name");
+
         arrayDecl();
-        if(!consume(SEMICOLON)){
-            tkerr(crtTk,"missing ; after variable deffinition");
-        }
+
+        if(!consume(SEMICOLON))
+            tkerr(crtTk,"missing ; after variable definition");
+
         return 1;
-       
     }
+
     crtTk=startTk;
     return 0;
-
 }
 
 int structDef(){
     Token *startTk=crtTk;
+
     if(consume(STRUCT)){
-        if(!consume(ID)){
+        if(!consume(ID))
             tkerr(crtTk,"missing struct name");
-        }
-        if(!consume(LACC)){
-            tkerr(crtTk,"missing ( in struct definition");
-        }
+
+        if(!consume(LACC))
+            tkerr(crtTk,"missing { in struct definition");
+
         while(varDef()){}
-        if(!consume(RACC)){
+
+        if(!consume(RACC))
             tkerr(crtTk,"missing } in struct definition");
-        }
-        if(!consume(SEMICOLON)){
-            tkerr(crtTk,"missing ; after struct deffinition");
-        }
+
+        if(!consume(SEMICOLON))
+            tkerr(crtTk,"missing ; after struct definition");
+
         return 1;
-        
     }
+
     crtTk=startTk;
     return 0;
 }
 
 int fnParam(){
     Token *startTk=crtTk;
+
     if(typeBase()){
-        if(!consume(ID)){
+        if(!consume(ID))
             tkerr(crtTk,"missing parameter name");
 
-        }
-          arrayDecl();
-          return 1;
+        arrayDecl();
+        return 1;
     }
+
+    crtTk=startTk;
+    return 0;
+}
+
+int fnDef(){
+    Token *startTk=crtTk;
+
+    if(typeBase() || consume(VOID)){
+        if(!consume(ID))
+            tkerr(crtTk,"missing function name");
+
+        if(!consume(LPAR))
+            tkerr(crtTk,"missing ( after function name");
+
+        if(fnParam()){
+            while(consume(COMMA)){
+                if(!fnParam())
+                    tkerr(crtTk,"missing function parameter after ,");
+            }
+        }
+
+        if(!consume(RPAR))
+            tkerr(crtTk,"missing ) after function parameters");
+
+        if(!stmCompound())
+            tkerr(crtTk,"missing function body");
+
+        return 1;
+    }
+
     crtTk=startTk;
     return 0;
 }
 
 int stmCompound(){
-    if(!consume(LACC)){
-        return 0;
-    }
+    if(!consume(LACC)) return 0;
+
     while(1){
         if(varDef()){
-
         }
         else if(stm()){
-
         }
-        else{
-            break;
-        }
+        else break;
     }
-    if(!consume(RACC)) {
-        tkerr(crtTk,"missing } or invalid statment");
+
+    if(!consume(RACC))
+        tkerr(crtTk,"missing } or invalid statement");
+
+    return 1;
+}
+
+int stm(){
+    Token *startTk=crtTk;
+
+    if(stmCompound()) return 1;
+
+    if(consume(IF)){
+        if(!consume(LPAR)) tkerr(crtTk,"missing ( after if");
+        if(!expr()) tkerr(crtTk,"invalid expression after if (");
+        if(!consume(RPAR)) tkerr(crtTk,"missing ) after if condition");
+        if(!stm()) tkerr(crtTk,"missing statement after if");
+
+        if(consume(ELSE)){
+            if(!stm()) tkerr(crtTk,"missing statement after else");
+        }
+
         return 1;
     }
+
+    if(consume(WHILE)){
+        if(!consume(LPAR)) tkerr(crtTk,"missing ( after while");
+        if(!expr()) tkerr(crtTk,"invalid expression after while (");
+        if(!consume(RPAR)) tkerr(crtTk,"missing ) after while condition");
+        if(!stm()) tkerr(crtTk,"missing while statement");
+        return 1;
+    }
+
+    if(consume(FOR)){
+        if(!consume(LPAR)) tkerr(crtTk,"missing ( after for");
+
+        expr();
+
+        if(!consume(SEMICOLON))
+            tkerr(crtTk,"missing ; after first for expression");
+
+        expr();
+
+        if(!consume(SEMICOLON))
+            tkerr(crtTk,"missing ; after second for expression");
+
+        expr();
+
+        if(!consume(RPAR))
+            tkerr(crtTk,"missing ) after for");
+
+        if(!stm())
+            tkerr(crtTk,"missing for statement");
+
+        return 1;
+    }
+
+    if(consume(BREAK)){
+        if(!consume(SEMICOLON))
+            tkerr(crtTk,"missing ; after break");
+        return 1;
+    }
+
+    if(consume(RETURN)){
+        expr();
+
+        if(!consume(SEMICOLON))
+            tkerr(crtTk,"missing ; after return");
+
+        return 1;
+    }
+
+    if(expr()){
+        if(!consume(SEMICOLON))
+            tkerr(crtTk,"missing ; after expression");
+        return 1;
+    }
+
+    if(consume(SEMICOLON))
+        return 1;
+
+    crtTk=startTk;
+    return 0;
+}
+
+int expr(){
+    return exprAssign();
+}
+
+int exprAssign(){
+    Token *startTk=crtTk;
+
+    if(exprUnary()){
+        if(consume(ASSIGN)){
+            if(!exprAssign())
+                tkerr(crtTk,"missing expression after =");
+            return 1;
+        }
+
+        crtTk=startTk;
+    }
+
+    return exprOr();
+}
+
+int exprOr(){
+    if(!exprAnd()) return 0;
+
+    while(consume(OR)){
+        if(!exprAnd())
+            tkerr(crtTk,"missing expression after ||");
+    }
+
+    return 1;
+}
+
+int exprAnd(){
+    if(!exprEq()) return 0;
+
+    while(consume(AND)){
+        if(!exprEq())
+            tkerr(crtTk,"missing expression after &&");
+    }
+
+    return 1;
+}
+
+int exprEq(){
+    if(!exprRel()) return 0;
+
+    while(1){
+        if(consume(EQUAL)){
+            if(!exprRel()) tkerr(crtTk,"missing expression after ==");
+        }
+        else if(consume(NOTEQ)){
+            if(!exprRel()) tkerr(crtTk,"missing expression after !=");
+        }
+        else break;
+    }
+
+    return 1;
+}
+
+int exprRel(){
+    if(!exprAdd()) return 0;
+
+    while(1){
+        if(consume(LESS)){
+            if(!exprAdd()) tkerr(crtTk,"missing expression after <");
+        }
+        else if(consume(LESSEQ)){
+            if(!exprAdd()) tkerr(crtTk,"missing expression after <=");
+        }
+        else if(consume(GREATER)){
+            if(!exprAdd()) tkerr(crtTk,"missing expression after >");
+        }
+        else if(consume(GREATEREQ)){
+            if(!exprAdd()) tkerr(crtTk,"missing expression after >=");
+        }
+        else break;
+    }
+
+    return 1;
+}
+
+int exprAdd(){
+    if(!exprMul()) return 0;
+
+    while(1){
+        if(consume(ADD)){
+            if(!exprMul()) tkerr(crtTk,"missing expression after +");
+        }
+        else if(consume(SUB)){
+            if(!exprMul()) tkerr(crtTk,"missing expression after -");
+        }
+        else break;
+    }
+
+    return 1;
+}
+
+int exprMul(){
+    if(!exprCast()) return 0;
+
+    while(1){
+        if(consume(MUL)){
+            if(!exprCast()) tkerr(crtTk,"missing expression after *");
+        }
+        else if(consume(DIV)){
+            if(!exprCast()) tkerr(crtTk,"missing expression after /");
+        }
+        else break;
+    }
+
+    return 1;
+}
+
+int exprCast(){
+    Token *startTk=crtTk;
+
+    if(consume(LPAR)){
+        if(typeBase()){
+            arrayDecl();
+
+            if(!consume(RPAR))
+                tkerr(crtTk,"missing ) after cast type");
+
+            if(!exprCast())
+                tkerr(crtTk,"missing expression after cast");
+
+            return 1;
+        }
+
+        crtTk=startTk;
+    }
+
+    return exprUnary();
+}
+
+int exprUnary(){
+    if(consume(SUB)){
+        if(!exprUnary()) tkerr(crtTk,"missing expression after unary -");
+        return 1;
+    }
+
+    if(consume(NOT)){
+        if(!exprUnary()) tkerr(crtTk,"missing expression after !");
+        return 1;
+    }
+
+    return exprPostfix();
+}
+
+int exprPostfix(){
+    if(!exprPrimary()) return 0;
+
+    while(1){
+        if(consume(LBRACKET)){
+            if(!expr()) tkerr(crtTk,"missing expression inside []");
+            if(!consume(RBRACKET)) tkerr(crtTk,"missing ]");
+        }
+        else if(consume(DOT)){
+            if(!consume(ID)) tkerr(crtTk,"missing field name after .");
+        }
+        else break;
+    }
+
+    return 1;
+}
+
+int exprPrimary(){
+    Token *startTk=crtTk;
+
+    if(consume(ID)){
+        if(consume(LPAR)){
+            if(expr()){
+                while(consume(COMMA)){
+                    if(!expr())
+                        tkerr(crtTk,"missing expression after ,");
+                }
+            }
+
+            if(!consume(RPAR))
+                tkerr(crtTk,"missing ) after function call");
+
+            return 1;
+        }
+
+        return 1;
+    }
+
+    if(consume(CT_INT)) return 1;
+    if(consume(CT_REAL)) return 1;
+    if(consume(CT_CHAR)) return 1;
+    if(consume(CT_STRING)) return 1;
+
+    if(consume(LPAR)){
+        if(!expr())
+            tkerr(crtTk,"invalid expression after (");
+
+        if(!consume(RPAR))
+            tkerr(crtTk,"missing )");
+
+        return 1;
+    }
+
+    crtTk=startTk;
+    return 0;
+}
+
+int unit(){
+    while(1){
+        if(structDef()){
+        }
+        else if(fnDef()){
+        }
+        else if(varDef()){
+        }
+        else break;
+    }
+
+    if(!consume(END))
+        tkerr(crtTk,"syntax error");
+
+    return 1;
 }
 
 
-
-
-
-int main(int argc, char **argv) {
+int main(int argc,char **argv){
     char *buf;
 
-    if(argc!= 2) {
-        printf("Usage: %s input.c\n", argv[0]);
+    if(argc!=2){
+        printf("Usage: %s input.c\n",argv[0]);
         return 1;
     }
 
     buf=load_file(argv[1]);
     pCrtCh=buf;
 
-    while(getNextToken()!=END) {
+    while(getNextToken()!=END){
     }
+
+    crtTk=tokens;
+
+    if(unit()){
+        printf("Syntax is correct.\n");
+    }
+
     showTokens();
+
     free_memory();
     free(buf);
-     return 0;
+
+    return 0;
 }
-
-
-
